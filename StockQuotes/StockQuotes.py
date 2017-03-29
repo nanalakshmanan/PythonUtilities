@@ -159,15 +159,6 @@ def get_stock_info(symbol):
     info = StockInfo(symbol, open_price, price, year_high, ave_50day_moving)
     return info
 
-def print_my_stocks():
-    "Print the stock information for symbols that I am interested in"
-    mysymbols = ['AMZN', 'MSFT', 'AAPL', 'SPY', 'PJP', 'XPH', 'VWO',
-                 'VNQ', 'QQQ', 'IBB', 'INDY', 'FB', 'BABA', 'VOO', 'XLE']
-    StockInfo.pretty_print_headers()
-    stock_info_list = map(get_stock_info, mysymbols)
-    for stock_info in stock_info_list:
-        stock_info.pretty_print()
-
 def make_stock_lot(row):
     "Make a Stock Info object from a row of csv"
     date = (row[3])
@@ -197,4 +188,3 @@ def print_my_csv():
     print_csv_data("Data.csv")
 
 print_my_csv()
-#print_my_stocks()
