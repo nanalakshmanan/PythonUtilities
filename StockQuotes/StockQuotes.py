@@ -22,31 +22,33 @@ class StockInfo(object):
     price = 0.0
     high52week = 0.0
     ave50day = 0.0
+    ave200day = 0.0
 
-    def __init__(self, symbol, openprice, price, high52week, ave50day):
+    def __init__(self, symbol, openprice, price, high52week, ave50day, ave200day):
         self.symbol = symbol
         self.openprice = openprice
         self.price = price
         self.high52week = high52week
         self.ave50day = ave50day
+        self.ave200day = ave200day
 
     def pretty_print(self):
         "Print the stock symbol and price formatted correctly"
         watch = ""
-        format_str = '{:6s}   {:8.2f}   {:8.2f}   {:8.2f}   {:8.2f}   {:1s}'
+        format_str = '{:6s}   {:8.2f}   {:8.2f}   {:8.2f}   {:8.2f}   {:8.2f}   {:1s}'
 
-        if self.price < self.ave50day:
+        if self.ave50day < self.ave200day:
             watch = "X"
 
         print format_str.format(self.symbol, self.openprice, self.price, self.ave50day,
-                                self.high52week, watch)
+                                self.ave200day, self.high52week, watch)
 
     @staticmethod
     def pretty_print_headers():
         "Print the headers in the desired format"
-        format_str = '{:>6}   {:>8}   {:>8}   {:>8}   {:>8}'
-        print format_str.format("SYMBOL", "OPEN", "PRICE", "50DAYAVE", "YEARHIGH")
-        print format_str.format("------", "----", "-----", "--------", "--------")
+        format_str = '{:>6}   {:>8}   {:>8}   {:>8}   {:>8}   {:>8}'
+        print format_str.format("SYMBOL", "OPEN", "PRICE", "50DAYAVE", "200DAYAVE", "YEARHIGH")
+        print format_str.format("------", "----", "-----", "--------", "---------", "--------")
 
 class StockInfoCache(object):
     "Cache of stock info"
@@ -117,24 +119,24 @@ class StockLot(object):
         watch = ""
         stock_lot_type_display = self.get_stock_lot_type_display()
 
-        if self.stock_info.price < self.stock_info.ave50day:
+        if self.stock_info.ave50day < self.stock_info.ave200day:
             watch = "X"
-        format_str = '{:6s}   {:8.2f}   {:8.2f}   {:8.2f}   {:8.2f}   {:8.2f}   {:8.2f}   {:8.2f}   {:>5}   {:1s}'
+        format_str = '{:6s}   {:8.2f}   {:8.2f}   {:8.2f}   {:8.2f}   {:8.2f}   {:8.2f}   {:8.2f}   {:8.2f}   {:>5}   {:1s}'
         stock_info = self.stock_info
         tax, gross_value, net_value = self.calculate_tax()
-        
+
         print format_str.format(self.symbol, self.purchase_price, stock_info.price,
-                                stock_info.ave50day, stock_info.high52week, self.gain,
-                                gross_value, net_value,
+                                stock_info.ave50day, stock_info.ave200day, stock_info.high52week,
+                                self.gain, gross_value, net_value,
                                 stock_lot_type_display, watch)
 
     @staticmethod
     def pretty_print_headers():
         "Print the headers in the desired format"
-        format_str = '{:>6}   {:>8}   {:>8}   {:>8}   {:>8}   {:>8}   {:>8}   {:>8}   {:>5}'
-        print format_str.format("SYMBOL", "PURCHASE", "PRICE", "50DAYAVE",
+        format_str = '{:>6}   {:>8}   {:>8}   {:>8}   {:>8}   {:>8}   {:>8}   {:>8}   {:>8}   {:>5}'
+        print format_str.format("SYMBOL", "PURCHASE", "PRICE", "50DAYAVE", "200DAYAVE",
                                 "YEARHIGH", "GAIN", "GROSS", "NET", "TYPE")
-        print format_str.format("------", "--------", "-----", "--------",
+        print format_str.format("------", "--------", "-----", "--------", "---------", 
                                 "--------", "-----", "---", "----", "----")
 
 STOCK_INFO_CACHE = StockInfoCache()
@@ -155,8 +157,8 @@ def get_stock_info(symbol):
     open_price = safe_convert_to_float(stock.get_open())
     year_high = safe_convert_to_float(stock.get_year_high())
     ave_50day_moving = safe_convert_to_float(stock.get_50day_moving_avg())
-
-    info = StockInfo(symbol, open_price, price, year_high, ave_50day_moving)
+    ave_200day_moving = safe_convert_to_float(stock.get_200day_moving_avg())
+    info = StockInfo(symbol, open_price, price, year_high, ave_50day_moving, ave_200day_moving)
     return info
 
 def make_stock_lot(row):
