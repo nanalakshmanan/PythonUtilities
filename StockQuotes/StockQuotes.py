@@ -2,7 +2,8 @@
 "Print stock prices of companies I am interested in"
 import csv
 import datetime
-from yahoo_finance import Share
+from numpy import float64
+from yfinance import Ticker
 
 def safe_convert_to_float(value):
     "Convert the value to float. Return 0 if conversion fails"
@@ -40,15 +41,15 @@ class StockInfo(object):
         if self.ave50day < self.ave200day:
             watch = "X"
 
-        print format_str.format(self.symbol, self.openprice, self.price, self.ave50day,
-                                self.ave200day, self.high52week, watch)
+        print(format_str.format(self.symbol, self.openprice, self.price, self.ave50day,
+                                self.ave200day, self.high52week, watch))
 
     @staticmethod
     def pretty_print_headers():
         "Print the headers in the desired format"
         format_str = '{:>6}   {:>8}   {:>8}   {:>8}   {:>8}   {:>8}'
-        print format_str.format("SYMBOL", "OPEN", "PRICE", "50DAYAVE", "200DAYAVE", "YEARHIGH")
-        print format_str.format("------", "----", "-----", "--------", "---------", "--------")
+        print(format_str.format("SYMBOL", "OPEN", "PRICE", "50DAYAVE", "200DAYAVE", "52-WEEK-HIGH"))
+        print(format_str.format("------", "----", "-----", "--------", "---------", "------------"))
 
 class StockInfoCache(object):
     "Cache of stock info"
@@ -121,23 +122,23 @@ class StockLot(object):
 
         if self.stock_info.ave50day < self.stock_info.ave200day:
             watch = "X"
-        format_str = '{:6s}   {:8.2f}   {:8.2f}   {:8.2f}   {:8.2f}   {:8.2f}   {:8.2f}   {:8.2f}   {:8.2f}   {:>5}   {:1s}'
+        format_str = '{:6s}   {:8.2f}   {:8.2f}   {:8.2f}   {:9.2f}   {:12.2f}   {:8.2f}   {:10.2f}   {:10.2f}   {:>5}   {:1s}'
         stock_info = self.stock_info
         tax, gross_value, net_value = self.calculate_tax()
 
-        print format_str.format(self.symbol, self.purchase_price, stock_info.price,
+        print(format_str.format(self.symbol, self.purchase_price, stock_info.price,
                                 stock_info.ave50day, stock_info.ave200day, stock_info.high52week,
                                 self.gain, gross_value, net_value,
-                                stock_lot_type_display, watch)
+                                stock_lot_type_display, watch))
 
     @staticmethod
     def pretty_print_headers():
         "Print the headers in the desired format"
-        format_str = '{:>6}   {:>8}   {:>8}   {:>8}   {:>8}   {:>8}   {:>8}   {:>8}   {:>8}   {:>5}'
-        print format_str.format("SYMBOL", "PURCHASE", "PRICE", "50DAYAVE", "200DAYAVE",
-                                "YEARHIGH", "GAIN", "GROSS", "NET", "TYPE")
-        print format_str.format("------", "--------", "-----", "--------", "---------", 
-                                "--------", "-----", "---", "----", "----")
+        format_str = '{:>6}   {:>8}   {:>8}   {:>8}   {:>8}   {:>8}   {:>8}   {:>10}   {:>10}   {:>5}'
+        print(format_str.format("SYMBOL", "PURCHASE", "PRICE", "50DAYAVE", "200DAYAVE",
+                                "52-WEEK-HIGH", "GAIN", "GROSS", "NET", "TYPE"))
+        print(format_str.format("------", "--------", "-----", "--------", "---------", 
+                                "------------", "----", "-----", "----", "----"))
 
 STOCK_INFO_CACHE = StockInfoCache()
 
@@ -145,21 +146,30 @@ def get_stock_info_from_cache(symbol):
     "Return element from cache if available, if not create"
     if STOCK_INFO_CACHE.get(symbol) != None:
         return STOCK_INFO_CACHE.get(symbol)
-    stock = Share(symbol)
-    stock.refresh()
+    stock = Ticker(symbol)
+    #stock.refresh()
     STOCK_INFO_CACHE.add(symbol, stock)
     return stock
 
 def get_stock_info(symbol):
     "Make a stock info object from the symbol"
     stock = get_stock_info_from_cache(symbol)
-    price = safe_convert_to_float(stock.get_price())
-    open_price = safe_convert_to_float(stock.get_open())
-    year_high = safe_convert_to_float(stock.get_year_high())
-    ave_50day_moving = safe_convert_to_float(stock.get_50day_moving_avg())
-    ave_200day_moving = safe_convert_to_float(stock.get_200day_moving_avg())
+    data = stock.history(period='1y')
+    latest = data.tail(1)
+    if "currentPrice" in stock.info:
+        price = safe_convert_to_float(stock.info["currentPrice"])
+    elif "previousClose" in stock.info:
+        price = safe_convert_to_float(stock.info["previousClose"])
+    else:
+        price = 0.0
+    open_price = safe_convert_to_float(latest["Open"])
+    year_high = safe_convert_to_float(stock.info["fiftyTwoWeekHigh"])
+    ave_50day_moving = safe_convert_to_float(stock.info["fiftyDayAverage"])
+    ave_200day_moving = safe_convert_to_float(stock.info["twoHundredDayAverage"])
     info = StockInfo(symbol, open_price, price, year_high, ave_50day_moving, ave_200day_moving)
     return info
+    
+
 
 def make_stock_lot(row):
     "Make a Stock Info object from a row of csv"
@@ -171,17 +181,23 @@ def make_stock_lot(row):
 def print_csv_data(datafilename):
     "Print contents of a csv file"
     StockLot.pretty_print_headers()
-    stock_lot_list = get_stock_lot(datafilename)
-    for stock_lot in stock_lot_list:
-        stock_lot.pretty_print()
+    stock_lot_list = get_stock_lot(datafilename, True)
 
-def get_stock_lot(datafilename):
+    #for stock_lot in stock_lot_list:
+    #    stock_lot.pretty_print()
+
+def get_stock_lot(datafilename, printvalues=False):
     "Gets a list of stock lot objects from the data file"
     stock_lot_list = []
-    with open(datafilename, 'rb') as csvfile:
+    #with open(self.filename, 'r', newline=self.newline) as csvfile:
+    with open(datafilename, 'r', newline='') as csvfile:
+    #with open(datafilename, 'r') as csvfile:
         reader = csv.reader(csvfile, delimiter=',', dialect=csv.excel)
         for row in reader:
             stock_lot = make_stock_lot(row)
+            if printvalues:
+                stock_lot.pretty_print()
+
             stock_lot_list.append(stock_lot)
     return stock_lot_list
 
