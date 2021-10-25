@@ -57,12 +57,28 @@ class StockInfoCache(object):
 
     def add(self, key, elem):
         "Add an element to the cache"
-        self.cache[key] = elem
+        currentPrice = get_current_price(elem)
+        priceTime = datetime.datetime.now()
+        cachedvalue = (priceTime, currentPrice, elem)
+        self.cache[key] = cachedvalue
 
     def get(self, key):
         "Returns an element from the cache"
         if key in self.cache.keys():
             return self.cache[key]
+        else:
+            return None
+    
+    def update_cache_get(self, key):
+        "Returns an element from the cache after updating the price"
+        if key in self.cache.keys():
+            priceTime, currentPrice, elem = self.cache[key]
+            currentPrice = get_current_price(elem)
+            priceTime = datetime.datetime.now()
+            cachedvalue = (priceTime, currentPrice, elem)
+            self.cache[key] = cachedvalue
+
+            return cachedvalue
         else:
             return None
 
@@ -151,17 +167,30 @@ def get_stock_info_from_cache(symbol):
     STOCK_INFO_CACHE.add(symbol, stock)
     return stock
 
-def get_stock_info(symbol):
-    "Make a stock info object from the symbol"
-    stock = get_stock_info_from_cache(symbol)
-    data = stock.history(period='1y')
-    latest = data.tail(1)
+def get_current_price(stock):
+    "Get the current price of the stock"
     if "currentPrice" in stock.info:
         price = safe_convert_to_float(stock.info["currentPrice"])
     elif "previousClose" in stock.info:
         price = safe_convert_to_float(stock.info["previousClose"])
     else:
         price = 0.0
+    
+    return price
+
+def get_stock_info(symbol):
+    "Make a stock info object from the symbol"
+    stock = get_stock_info_from_cache(symbol)
+    priceTime, price, stock = get_stock_info_from_cache(symbol)
+    now = datetime.datetime.now()
+    elapsed = now - priceTime
+    
+    if elapsed.seconds > 10:
+        priceTime, price, stock = STOCK_INFO_CACHE.update_cache_get(symbol)
+
+    data = stock.history(period='7d')
+    latest = data.tail(1)
+    #price = get_current_price(stock)
     open_price = safe_convert_to_float(latest["Open"])
     year_high = safe_convert_to_float(stock.info["fiftyTwoWeekHigh"])
     ave_50day_moving = safe_convert_to_float(stock.info["fiftyDayAverage"])
@@ -169,7 +198,6 @@ def get_stock_info(symbol):
     info = StockInfo(symbol, open_price, price, year_high, ave_50day_moving, ave_200day_moving)
     return info
     
-
 
 def make_stock_lot(row):
     "Make a Stock Info object from a row of csv"
