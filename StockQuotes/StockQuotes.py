@@ -171,6 +171,12 @@ def get_current_price(stock):
     "Get the current price of the stock"
     if "currentPrice" in stock.info:
         price = safe_convert_to_float(stock.info["currentPrice"])
+    
+    data = stock.history(period='7d')
+    latest = data.tail(1)
+
+    if "Close" in latest:
+        price = safe_convert_to_float(latest["Close"])       
     elif "previousClose" in stock.info:
         price = safe_convert_to_float(stock.info["previousClose"])
     else:
@@ -198,7 +204,6 @@ def get_stock_info(symbol):
     info = StockInfo(symbol, open_price, price, year_high, ave_50day_moving, ave_200day_moving)
     return info
     
-
 def make_stock_lot(row):
     "Make a Stock Info object from a row of csv"
     date = (row[3])
@@ -231,6 +236,6 @@ def get_stock_lot(datafilename, printvalues=False):
 
 def print_my_csv():
     "Print the details of csv file of interest"
-    print_csv_data("Data.csv")
+    print_csv_data("Stocks.csv")
 
 print_my_csv()
