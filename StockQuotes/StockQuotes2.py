@@ -26,7 +26,8 @@ FIELDS = [
     "52 Week High",
     "50 Day MA",
     "200 Day MA",
-    "Indicator"
+    "Indicator",
+    "Sector"
 ]
 
 def fetch_stock_info(ticker):
@@ -34,8 +35,7 @@ def fetch_stock_info(ticker):
     Fetch relevant data for a given stock ticker.
     """
     try:
-        #logger.info(f"{ticker}...")
-        logger.info(f"\033[92m{ticker}\033[0m")
+        logger.info(f"{ticker}...")
         stock = yf.Ticker(ticker)
         info = stock.info
         data = {
@@ -46,6 +46,7 @@ def fetch_stock_info(ticker):
             "52 Week High": info.get("fiftyTwoWeekHigh"),
             "50 Day MA": info.get("fiftyDayAverage"),
             "200 Day MA": info.get("twoHundredDayAverage"),
+            "Sector": info.get("sector")
         }
         return data
     except Exception as e:
@@ -57,7 +58,8 @@ def fetch_stock_info(ticker):
             "Current Price": None,
             "52 Week High": None,
             "50 Day MA": None,
-            "200 Day MA": None
+            "200 Day MA": None,
+            "Sector": None
         }
 
 def write_values_preserving_formatting(input_file, updated_df, sheet_name="Ticker"):
@@ -104,18 +106,23 @@ def process_excel(input_file):
     df.set_index("Ticker", inplace=True)
 
     for col in FIELDS[1:]:
-        if col == "Indicator" or col == "Beta":
+        if col == "Indicator" or col == "Beta" or col == "Sector":
             continue
         else:
             df[col] = stock_data_df[col]
 
-    # take the new beta value only if it is not NaN
+    # take the new beta and sector values only if it is not NaN
     df.update(stock_data_df[["Beta"]])
+    df.update(stock_data_df["Sector"])
 
     df["Indicator"] = df.apply(
         lambda row: "Bull" if pd.notnull(row["50 Day MA"]) and pd.notnull(row["200 Day MA"]) and row["50 Day MA"] > row["200 Day MA"] else "Bear",
         axis=1
     )
+
+    #df["Sector"] = df.apply(
+    #    lambda row: row["sector"], axis = 1
+    #)
     updated_df = df.reset_index()
 
     # Print updated values as a table
