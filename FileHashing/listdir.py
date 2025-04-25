@@ -5,13 +5,15 @@ import json
 from concurrent.futures import ThreadPoolExecutor, ProcessPoolExecutor
 import logging
 import argparse
+import orjson
 
 BATCH_SIZE = 20
 EXCLUDED_DIRS = {'$RECYCLE.BIN', 'System Volume Information'}
 HASH_ALGORITHM = 'blake2b'
-CHUNK_SIZE = 8388608  # 8 MB
+#CHUNK_SIZE = 8388608  # 8 MB
+CHUNK_SIZE = 134217728 # 128 MB
 
-# ✅ Separate flags for object-level and batch-level handling
+# Separate flags for object-level and batch-level handling
 first_entry_written = False
 first_batch_written = False
 
@@ -26,7 +28,7 @@ def setup_logging(logfile):
     formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
     handler.setFormatter(formatter)
     
-    # ✅ Remove any existing handlers to avoid duplicates
+    # Remove any existing handlers to avoid duplicates
     if logger.hasHandlers():
         logger.handlers.clear()
     
@@ -72,14 +74,14 @@ async def process_batch(batch):
     results = []
 
     with ProcessPoolExecutor() as hash_executor:
-        # ✅ Compute hashes in parallel using ProcessPoolExecutor
+        # Compute hashes in parallel using ProcessPoolExecutor
         hash_futures = [
             asyncio.get_event_loop().run_in_executor(hash_executor, compute_file_hash, file)
             for file in batch
         ]
         computed_hashes = await asyncio.gather(*hash_futures)
 
-        # ✅ Combine results
+        # Combine results
         for file, file_hash in zip(batch, computed_hashes):
             if file_hash:
                 result = {'file_path': str(file), 'hash': file_hash}
@@ -94,26 +96,26 @@ async def write_to_json(data, output_file, is_last_batch):
 
     if data:
         try:
-            with open(output_file, 'a') as f:
-                # ✅ Write opening bracket if this is the first batch
+            with open(output_file, 'ab') as f:
+                # Write opening bracket if this is the first batch
                 if not first_batch_written:
-                    f.write('{\n  "hashes": [\n')
+                    f.write(b'{\n  "hashes": [\n')
                     first_batch_written = True
 
                 for index, entry in enumerate(data):
-                    # ✅ Insert comma ONLY if this is NOT the first object in the entire file
+                    # Insert comma ONLY if this is NOT the first object in the entire file
                     if first_entry_written:
-                        f.write(',\n')
+                        f.write(b',\n')
 
-                    # ✅ Write the JSON object
-                    json.dump(entry, f, indent=4)
+                    # Write the JSON object
+                    f.write(orjson.dumps(entry))
 
-                    # ✅ Mark that an entry has been written (now it's safe to add a comma next time)
+                    # Mark that an entry has been written (now it's safe to add a comma next time)
                     first_entry_written = True
 
-                # ✅ If this is the last batch, close the JSON array and object properly
+                # If this is the last batch, close the JSON array and object properly
                 if is_last_batch:
-                    f.write('\n  ]\n}\n')
+                    f.write(b'\n  ]\n}\n')
 
         except Exception as e:
             logging.error(f"Error writing to JSON file: {e}")
@@ -123,16 +125,16 @@ async def main(root_dir, output_file, dry_run):
     global first_entry_written, first_batch_written
     is_last_batch = False
 
-    # ✅ Truncate the file if it already exists
-    open(output_file, 'w').close()
+    # Truncate the file if it already exists
+    open(output_file, 'wb').close()
 
     async for batch in list_files_in_batches(root_dir):
         logging.info(f"Processing batch of {len(batch)} files...")
 
-        # ✅ Make sure all hashes are computed before writing
+        # Make sure all hashes are computed before writing
         results = await process_batch(batch)
 
-        # ✅ Determine if this is the last batch
+        # Determine if this is the last batch
         is_last_batch = len(batch) < BATCH_SIZE
 
         if not dry_run and results:
@@ -140,10 +142,10 @@ async def main(root_dir, output_file, dry_run):
 
         logging.info('-' * 40)
 
-    # ✅ Ensure the JSON is properly closed if it wasn't closed in the last batch
+    # Ensure the JSON is properly closed if it wasn't closed in the last batch
     if not dry_run and not is_last_batch:
-        with open(output_file, 'a') as f:
-            f.write('\n  ]\n}\n')
+        with open(output_file, 'ab') as f:
+            f.write(b'\n  ]\n}\n')
 
 
 if __name__ == "__main__":
@@ -155,7 +157,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # ✅ Setup logging based on --logfile parameter
+    # Setup logging based on --logfile parameter
     setup_logging(args.logfile)
 
     asyncio.run(main(args.root_dir, args.output, args.dry_run))
